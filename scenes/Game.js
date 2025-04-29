@@ -1,21 +1,13 @@
-// URL to explain PHASER scene: https://rexrainbow.github.io/phaser3-rex-notes/docs/site/scene/
-
 export default class Game extends Phaser.Scene {
   constructor() {
-    // key of the scene
-    // the key will be used to start the scene by other scenes
     super("game");
   }
 
   init() {
-    // this is called before the scene is created
-    // init variables
-    // take data passed from other scenes
-    // data object param {}
+    this.initialTime = 30;
   }
 
   preload() {
-    // load assets
     this.load.image("sky", "./public/assets/sky.png");
     this.load.image("ground", "./public/assets/platform.png");
     this.load.image("star", "./public/assets/star.png");
@@ -27,19 +19,15 @@ export default class Game extends Phaser.Scene {
   }
 
   create() {
-    // create game objects
     this.add.image(400, 300, "sky");
 
     this.platforms = this.physics.add.staticGroup();
-
     this.platforms.create(400, 568, "ground").setScale(2).refreshBody();
-
     this.platforms.create(600, 400, "ground");
     this.platforms.create(50, 250, "ground");
     this.platforms.create(750, 220, "ground");
 
     this.player = this.physics.add.sprite(100, 450, "dude");
-
     this.player.setBounce(0.2);
     this.player.setCollideWorldBounds(true);
 
@@ -64,6 +52,7 @@ export default class Game extends Phaser.Scene {
     });
 
     this.cursors = this.input.keyboard.createCursorKeys();
+    this.rKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
 
     this.stars = this.physics.add.group({
       key: "star",
@@ -85,40 +74,47 @@ export default class Game extends Phaser.Scene {
       fill: "#000",
     });
 
+    this.timerText = this.add.text(600, 16, `Time: ${this.initialTime}`, {
+      fontSize: "32px",
+      fill: "#000",
+    });
+
+    this.timeEvent = this.time.addEvent({
+      delay: 1000,
+      callback: this.onSecond,
+      callbackScope: this,
+      loop: true,
+    });
+
+    this.gameOverText = this.add.text(400, 300, "GAME OVER", {
+      fontSize: "64px",
+      fill: "#ff0000",
+    });
+    this.gameOverText.setOrigin(0.5);
+    this.gameOverText.setVisible(false);
+
     this.physics.add.collider(this.player, this.platforms);
-
     this.physics.add.collider(this.stars, this.platforms);
-
-    this.physics.add.overlap(
-      this.player,
-      this.stars,
-      this.collectStar,
-      null,
-      this
-    );
-
-    this.physics.add.collider(
-      this.player,
-      this.bombs,
-      this.hitBomb,
-      null,
-      this
-    );
+    this.physics.add.overlap(this.player, this.stars, this.collectStar, null, this);
+    this.physics.add.collider(this.player, this.bombs, this.hitBomb, null, this);
   }
 
   update() {
-    // update game objects
+    if (this.gameOver) {
+      if (Phaser.Input.Keyboard.JustDown(this.rKey)) {
+        this.scene.restart();
+      }
+      return;
+    }
+
     if (this.cursors.left.isDown) {
       this.player.setVelocityX(-160);
-
       this.player.anims.play("left", true);
     } else if (this.cursors.right.isDown) {
       this.player.setVelocityX(160);
-
       this.player.anims.play("right", true);
     } else {
       this.player.setVelocityX(0);
-
       this.player.anims.play("turn");
     }
 
@@ -134,15 +130,13 @@ export default class Game extends Phaser.Scene {
     this.scoreText.setText(`Score: ${this.score}`);
 
     if (this.stars.countActive(true) === 0) {
-      //  A new batch of stars to collect
       this.stars.children.iterate(function (child) {
         child.enableBody(true, child.x, 0, true, true);
       });
 
-      var x =
-        this.player.x < 400
-          ? Phaser.Math.Between(400, 800)
-          : Phaser.Math.Between(0, 400);
+      var x = this.player.x < 400
+        ? Phaser.Math.Between(400, 800)
+        : Phaser.Math.Between(0, 400);
 
       var bomb = this.bombs.create(x, 16, "bomb");
       bomb.setBounce(1);
@@ -154,11 +148,24 @@ export default class Game extends Phaser.Scene {
 
   hitBomb(player, bomb) {
     this.physics.pause();
-
     this.player.setTint(0xff0000);
-
     this.player.anims.play("turn");
-
     this.gameOver = true;
+    this.gameOverText.setVisible(true);
+  }
+
+  onSecond() {
+    if (!this.gameOver) {
+      this.initialTime -= 1;
+      this.timerText.setText('Time: ' + this.initialTime);
+
+      if (this.initialTime <= 0) {
+        this.physics.pause();
+        this.player.setTint(0xff0000);
+        this.player.anims.play("turn");
+        this.gameOver = true;
+        this.gameOverText.setVisible(true);
+      }
+    }
   }
 }
